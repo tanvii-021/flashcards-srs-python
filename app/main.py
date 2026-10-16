@@ -174,7 +174,8 @@ def answer(user: str, payload: dict = Body(...)):
         c.rpush(key, str(card["id"]))
         c.expire(key, QUEUE_TTL)
 
-    return {"user": user, "card_id": card["id"], "front": card["front"],
+    return {"message": "Card reviewed successfully!",
+            "user": user, "card_id": card["id"], "front": card["front"],
             "grade": grade, "passed": result["passed"],
             "repetitions": result["repetitions"], "ease": result["ease"],
             "interval_days": result["interval"],
@@ -182,7 +183,7 @@ def answer(user: str, payload: dict = Body(...)):
             "study_day": today.isoformat(),
             "same_session": result["same_session"],
             "ease_floored": result["ease_floored"],
-            "note": result["note"],
+            "note": result["note"] or ("Card passed!" if result["passed"] else "Card lapsed - will reappear today"),
             "remaining": c.llen(key)}
 
 
