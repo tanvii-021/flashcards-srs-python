@@ -1,0 +1,115 @@
+version: 2.1
+
+jobs:
+  qa-pipeline:
+    docker:
+      - image: cimg/python:3.11
+        environment:
+          DATABASE_URL: "postgresql://postgres:postgrespassword@localhost:5432/flashcards_db"
+          REDIS_URL: "redis://localhost:6379/0"
+      - image: cimg/postgres:15.10
+        environment:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgrespassword
+          POSTGRES_DB: flashcards_db
+      - image: cimg/redis:7.4
+    steps:
+      - checkout
+      - run:
+          name: Install Python Dependencies
+          command: |
+            pip install --no-cache-dir -r requirements.txt
+            pip install --no-cache-dir pytest pytest-cov httpx ruff
+      - run:
+          name: 1. Secret Scanning (Gitleaks)
+          command: |
+            curl -sSL https://github.com/gitleaks/gitleaks/releases/download/v8.18.4/gitleaks_8.18.4_linux_x64.tar.gz | tar -xz -C /tmp
+            /tmp/gitleaks detect --source=. --no-git --exit-code=1 --verbose --redact
+      - run:
+          name: 2. Code Linting (Ruff)
+          command: |
+            ruff check .
+      - run:
+          name: 3. Unit Tests (Minimum 70% Coverage)
+          command: |
+            pytest tests/test_unit.py -v --cov=app/schedule --cov-report=term-missing --cov-fail-under=70
+      - run:
+          name: Wait for Postgres and Redis
+          command: |
+            python -c '
+            import time, psycopg, redis
+            for _ in range(30):
+                try:
+                    conn = psycopg.connect("postgresql://postgres:postgrespassword@localhost:5432/flashcards_db")
+                    conn.close()
+                    r = redis.Redis.from_url("redis://localhost:6379/0")
+                    if r.ping():
+                        print("Database services ready!")
+                        break
+                except Exception:
+                    time.sleep(1)
+            else:
+                exit(1)
+            '
+      - run:
+          name: 4. Integration Tests
+          command: |
+            pytest tests/test_integration.py -v
+      - setup_remote_docker
+      - run:
+          name: 5 & 6. Build and Push Image (QA)
+          command: |
+            SHORT_SHA=$(echo $CIRCLE_SHA1 | cut -c1-7)
+            IMAGE_NAME="${DOCKERHUB_USER}/flashcards-srs-python"
+            echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USER" --password-stdin
+            docker build -t ${IMAGE_NAME}:qa -t ${IMAGE_NAME}:main-${SHORT_SHA} .
+            docker push ${IMAGE_NAME}:qa
+            docker push ${IMAGE_NAME}:main-${SHORT_SHA}
+
+  build-staging:
+    docker:
+      - image: cimg/base:current
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run:
+          name: Build and Push Image (Staging)
+          command: |
+            SHORT_SHA=$(echo $CIRCLE_SHA1 | cut -c1-7)
+            IMAGE_NAME="${DOCKERHUB_USER}/flashcards-srs-python"
+            echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USER" --password-stdin
+            docker build -t ${IMAGE_NAME}:stage -t ${IMAGE_NAME}:staging-${SHORT_SHA} .
+            docker push ${IMAGE_NAME}:stage
+            docker push ${IMAGE_NAME}:staging-${SHORT_SHA}
+
+  build-prod:
+    docker:
+      - image: cimg/base:current
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run:
+          name: Build and Push Image (Prod)
+          command: |
+            SHORT_SHA=$(echo $CIRCLE_SHA1 | cut -c1-7)
+            IMAGE_NAME="${DOCKERHUB_USER}/flashcards-srs-python"
+            echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USER" --password-stdin
+            docker build -t ${IMAGE_NAME}:prod -t ${IMAGE_NAME}:prod-${SHORT_SHA} .
+            docker push ${IMAGE_NAME}:prod
+            docker push ${IMAGE_NAME}:prod-${SHORT_SHA}
+
+workflows:
+  delivery-pipeline:
+    jobs:
+      - qa-pipeline:
+          filters:
+            branches:
+              only: main
+      - build-staging:
+          filters:
+            branches:
+              only: staging
+      - build-prod:
+          filters:
+            branches:
+              only: prod
