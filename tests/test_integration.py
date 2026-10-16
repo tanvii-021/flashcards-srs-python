@@ -49,23 +49,19 @@ def test_get_decks():
 
 def test_study_lifecycle():
   client = TestClient(app)
-  # 1. Start session
   start_res = client.post("/study/testuser/start?deck_id=1")
   assert start_res.status_code == 200
 
-  # 2. Get next card
   next_res = client.get("/study/testuser/next")
   assert next_res.status_code == 200
   card = next_res.json()
   card_id = card.get("id", 1)
 
-  # 3. Submit an answer (verifies the message added in Part 1)
   ans_res = client.post(
       "/study/testuser/answer", json={"card_id": card_id, "grade": 4}
   )
   assert ans_res.status_code == 200
   assert ans_res.json().get("message") == "Card reviewed successfully!"
 
-  # 4. View due cards and user stats
   assert client.get("/study/testuser/due").status_code == 200
   assert client.get("/stats/testuser").status_code == 200
