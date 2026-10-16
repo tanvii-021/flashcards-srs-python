@@ -28,11 +28,12 @@ jobs:
       - run:
           name: 2. Code Linting (Ruff)
           command: |
+            ruff check --fix .
             ruff check .
       - run:
           name: 3. Unit Tests (Minimum 70% Coverage)
           command: |
-            pytest tests/test_unit.py -v --cov=app/schedule --cov-report=term-missing --cov-fail-under=70
+            PYTHONPATH=. python -m pytest tests/test_unit.py -v --cov=app/schedule --cov-report=term-missing --cov-fail-under=70
       - run:
           name: Wait for Postgres and Redis
           command: |
@@ -54,7 +55,7 @@ jobs:
       - run:
           name: 4. Integration Tests
           command: |
-            pytest tests/test_integration.py -v
+            PYTHONPATH=. python -m pytest tests/test_integration.py -v
       - setup_remote_docker
       - run:
           name: 5 & 6. Build and Push Image (QA)
@@ -62,9 +63,10 @@ jobs:
             SHORT_SHA=$(echo $CIRCLE_SHA1 | cut -c1-7)
             IMAGE_NAME="${DOCKERHUB_USER}/flashcards-srs-python"
             echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USER" --password-stdin
-            docker build -t ${IMAGE_NAME}:qa -t ${IMAGE_NAME}:main-${SHORT_SHA} .
+            docker build -t ${IMAGE_NAME}:qa -t ${IMAGE_NAME}:main-${SHORT_SHA} -t ${IMAGE_NAME}:1.0 .
             docker push ${IMAGE_NAME}:qa
             docker push ${IMAGE_NAME}:main-${SHORT_SHA}
+            docker push ${IMAGE_NAME}:1.0
 
   build-staging:
     docker:
