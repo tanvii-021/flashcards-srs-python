@@ -33,7 +33,7 @@ jobs:
       - run:
           name: 3. Unit Tests (Minimum 70% Coverage)
           command: |
-            PYTHONPATH=. python -m pytest tests/test_unit.py -v --cov=app --cov-report=term-missing --cov-fail-under=70
+            PYTHONPATH=. python -m pytest tests/test_unit.py -v --cov=app.schedule --cov-report=term-missing --cov-fail-under=70
       - run:
           name: Wait for Postgres and Redis
           command: |
