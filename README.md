@@ -108,3 +108,18 @@ Write your answer in your README. It is worth more marks than the feature.
 | `relation "..." does not exist` | Migrations did not run, or the app started before they finished. |
 | Build takes minutes each time | `COPY . .` is above your dependency install. |
 | CI cannot reach the database | In CircleCI service containers the host **is** `localhost` — opposite of compose. |
+
+## My design decision: the day boundary
+
+I set the study-day boundary at 4 AM local time (IST), not midnight.
+A student revising at 23:58 and again at 00:02 is in one sitting, so both
+answers belong to the same study day. Anything before 04:00 counts as the
+previous day.
+
+The Redis queue key uses the study day, not the calendar date, so the day's
+queue is built once and does not reset at midnight.
+
+If a card is answered a second time within the same study day, only its ease
+is updated. The interval and repetition count stay as they are, because the
+student has not yet "slept on it". Otherwise answering twice in one evening
+would advance the interval twice and the schedule would stop meaning anything.
