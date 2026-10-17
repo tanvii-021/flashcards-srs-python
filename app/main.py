@@ -183,7 +183,7 @@ def answer(user: str, payload: dict = Body(...)):
             "study_day": today.isoformat(),
             "same_session": result["same_session"],
             "ease_floored": result["ease_floored"],
-            "note": result["note"] or ("Card passed!" if result["passed"] else "Card lapsed - will reappear today"),
+            "note": result["note"] or ("Card passed - great job!" if result["passed"] else "Card lapsed - will reappear today"),
             "remaining": c.llen(key)}
 
 
