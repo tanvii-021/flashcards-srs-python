@@ -174,7 +174,7 @@ def answer(user: str, payload: dict = Body(...)):
         c.rpush(key, str(card["id"]))
         c.expire(key, QUEUE_TTL)
 
-    return {"message": "Card reviewed successfully!",
+    return {"message": "The Card reviewed successfully!",
             "user": user, "card_id": card["id"], "front": card["front"],
             "grade": grade, "passed": result["passed"],
             "repetitions": result["repetitions"], "ease": result["ease"],
